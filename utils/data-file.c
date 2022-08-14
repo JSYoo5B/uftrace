@@ -131,6 +131,9 @@ int read_task_txt_file(struct uftrace_session_link *sess, char *dirname, char *s
 
 	pr_dbg("reading %s file\n", fname);
 	while (getline(&line, &sz, fp) >= 0) {
+		/*; Oct-14 #1.3.1.1
+		 *; "TASK": per thread. maybe named after "struct task_struct"
+		 *; "tid": thread id, "pid": process id */
 		if (!strncmp(line, "TASK", 4)) {
 			num = sscanf(line + 5, "timestamp=%lu.%lu tid=%d pid=%d", &sec, &nsec,
 				     &tmsg.tid, &tmsg.pid);
@@ -140,6 +143,9 @@ int read_task_txt_file(struct uftrace_session_link *sess, char *dirname, char *s
 			tmsg.time = (uint64_t)sec * NSEC_PER_SEC + nsec;
 			create_task(sess, &tmsg, false);
 		}
+		/*; Oct-14 #1.3.1.2
+		 *; "FORK": forked process. indicates process creation
+		 *; "pid": new forked pid, "ppid": parent pid */
 		else if (!strncmp(line, "FORK", 4)) {
 			num = sscanf(line + 5, "timestamp=%lu.%lu pid=%d ppid=%d", &sec, &nsec,
 				     &tmsg.tid, &tmsg.pid);
@@ -149,6 +155,10 @@ int read_task_txt_file(struct uftrace_session_link *sess, char *dirname, char *s
 			tmsg.time = (uint64_t)sec * NSEC_PER_SEC + nsec;
 			create_task(sess, &tmsg, true);
 		}
+		/*; Oct-14 #1.3.1.3
+		 *; "SESS": session, the initial process to be traced
+		 *; "pid": process id, "sid": session id (hashed?)
+		 *; "exename": executable name */
 		else if (!strncmp(line, "SESS", 4)) {
 			num = sscanf(line + 5, "timestamp=%lu.%lu %*[^i]id=%d sid=%s", &sec, &nsec,
 				     &smsg.task.pid, (char *)&smsg.sid);
@@ -172,6 +182,10 @@ int read_task_txt_file(struct uftrace_session_link *sess, char *dirname, char *s
 			create_session(sess, &smsg, dirname, symdir, exename, sym_rel_addr,
 				       needs_symtab, needs_srcline);
 		}
+		/*; Oct-14 #1.3.1.4
+		 *; "DLOP": dynamic library open
+		 *; when shared object were opened manually by `dlopen()`
+		 *; see `man 3 dlopen` */
 		else if (!strncmp(line, "DLOP", 4)) {
 			struct uftrace_session *s;
 
@@ -396,6 +410,12 @@ int open_info_file(struct uftrace_opts *opts, struct uftrace_data *handle)
 	return -saved_errno;
 ok:
 	saved_errno = 0;
+	/*; Oct-14 #1.1.1 comment:
+	 *; Is `handle->fp` necessary member for handle?
+	 *; file pointer's lifecycle ends here.
+	 *; its usage found in "./cmds/info.c"
+	 *; need to check and refactoring may reasonable.
+	 *; (at least, not necessary to assign in this code flow) */
 	handle->fp = fp;
 	handle->dirname = opts->dirname;
 	handle->depth = opts->depth;
@@ -425,6 +445,10 @@ ok:
 	    handle->hdr.version > UFTRACE_FILE_VERSION)
 		pr_err_ns("unsupported file version: %u\n", handle->hdr.version);
 
+	/*; Oct-14 #1.1.2 comment:
+	 *; `read_uftrace_info()` references handle->fp
+	 *; (defined in "./cmds/info.c")
+	 *; so, `handle->fp` is necessary. (answer about #1.1.1) */
 	if (read_uftrace_info(handle->hdr.info_mask, handle) < 0)
 		pr_err_ns("cannot read uftrace header info!\n");
 
@@ -441,17 +465,26 @@ int open_data_file(struct uftrace_opts *opts, struct uftrace_data *handle)
 	char buf[PATH_MAX];
 	int saved_errno = 0;
 
+	/*; Oct-14 #1.1 read "uftrace.data/info" as info file */
 	ret = open_info_file(opts, handle);
 	if (ret < 0) {
 		errno = -ret;
 		return -1;
 	}
 
+	/*; Oct-14 #1.2
+	 *; `handle` initialized with 0 at `open_info_file()`
+	 *; and `handle->info` updated before this check.
+	 *; (`open_info_file()`/`read_uftrace_info()`/`read_task_info()`)
+	 *; Maybe this means "uftrace.data/info" were not properly updated.
+	 *; (ex. SEGFAULT, unexpected program failure which affects uftrace) */
 	if (handle->info.nr_tid == 0) {
 		errno = ENODATA;
 		return -1;
 	}
 
+	/*; Oct-14 #1.3
+	 *; Get task(process/thread) list for tracing record. */
 	if (handle->hdr.feat_mask & TASK_SESSION) {
 		bool sym_rel = false;
 		struct uftrace_session_link *sessions = &handle->sessions;
@@ -461,6 +494,11 @@ int open_data_file(struct uftrace_opts *opts, struct uftrace_data *handle)
 			sym_rel = true;
 
 		/* read old task file first and then try task.txt file */
+		/*; Oct-14 #1.3.1
+		 *; There are two version of task file:
+		 *; "uftrace.data/task", old format (introduced at 3a1868345)
+		 *; "uftrace.data/task.txt", new format (introduced at 3f03bdb5c)
+		 *; TODO: check whether old format is necessary */
 		if (read_task_file(sessions, opts->dirname, true, sym_rel, opts->srcline) < 0 &&
 		    read_task_txt_file(sessions, opts->dirname, opts->with_syms ?: opts->dirname,
 				       true, sym_rel, opts->srcline) < 0) {
@@ -472,6 +510,9 @@ int open_data_file(struct uftrace_opts *opts, struct uftrace_data *handle)
 			goto out;
 		}
 
+		/*; Oct-14 #1.3.2
+		 *; it has been updated by reading `read_task_*file()`
+		 *; see Oct-14 #1.3.1.3.1 */
 		if (sessions->first == NULL) {
 			saved_errno = EINVAL;
 			goto out;

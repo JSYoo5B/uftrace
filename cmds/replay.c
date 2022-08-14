@@ -1120,6 +1120,7 @@ int command_replay(int argc, char *argv[], struct uftrace_opts *opts)
 	__fsetlocking(outfp, FSETLOCKING_BYCALLER);
 	__fsetlocking(logfp, FSETLOCKING_BYCALLER);
 
+	/*; Oct-14 #1. Read data file */
 	ret = open_data_file(opts, &handle);
 	if (ret < 0) {
 		pr_warn("cannot open record data: %s: %m\n", opts->dirname);

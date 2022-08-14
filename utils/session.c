@@ -246,6 +246,9 @@ void create_session(struct uftrace_session_link *sessions, struct uftrace_msg_se
 		load_debug_info(&s->sym_info, needs_srcline);
 	}
 
+	/*; Oct-14 #1.3.1.3.1
+	 *; `sessions->first` were updated here.
+	 *; TODO: can uftrace have multiple sessions? */
 	if (sessions->first == NULL)
 		sessions->first = s;
 
