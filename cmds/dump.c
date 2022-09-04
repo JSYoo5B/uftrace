@@ -71,6 +71,11 @@ struct uftrace_chrome_dump {
 	bool last_comma;
 };
 
+struct uftrace_firefox_dump {
+	struct uftrace_dump_ops ops;
+	/* Additional vars */
+};
+
 struct uftrace_flame_dump {
 	struct uftrace_dump_ops ops;
 	struct rb_root tasks;
@@ -1016,6 +1021,72 @@ static void dump_chrome_footer(struct uftrace_dump_ops *ops, struct uftrace_data
 	}
 }
 
+/* firefox support */
+static void dump_firefox_header(struct uftrace_dump_ops *ops, struct uftrace_data *handle,
+				struct uftrace_opts *opts)
+{
+}
+
+static void dump_firefox_task_start(struct uftrace_dump_ops *ops, struct uftrace_task_reader *task)
+{
+}
+
+static void dump_firefox_inverted_time(struct uftrace_dump_ops *ops,
+				       struct uftrace_task_reader *task)
+{
+}
+
+static void dump_firefox_task_rstack(struct uftrace_dump_ops *ops, struct uftrace_task_reader *task,
+				     char *name)
+{
+}
+
+static void dump_firefox_task_event(struct uftrace_dump_ops *ops, struct uftrace_task_reader *task)
+{
+}
+
+static void dump_firefox_kernel_start(struct uftrace_dump_ops *ops,
+				      struct uftrace_kernel_reader *kernel)
+{
+}
+
+static void dump_firefox_cpu_start(struct uftrace_dump_ops *ops,
+				   struct uftrace_kernel_reader *kernel, int cpu)
+{
+}
+
+static void dump_firefox_kernel_rstack(struct uftrace_dump_ops *ops,
+				       struct uftrace_kernel_reader *kernel, int cpu,
+				       struct uftrace_record *frs, char *name)
+{
+}
+
+static void dump_firefox_kernel_event(struct uftrace_dump_ops *ops,
+				      struct uftrace_kernel_reader *kernel, int cpu,
+				      struct uftrace_record *frs)
+{
+}
+
+static void dump_firefox_kernel_lost(struct uftrace_dump_ops *ops, uint64_t time, int tid,
+				     int losts)
+{
+}
+
+static void dump_firefox_perf_start(struct uftrace_dump_ops *ops, struct uftrace_perf_reader *perf,
+				    int cpu)
+{
+}
+
+static void dump_firefox_perf_event(struct uftrace_dump_ops *ops, struct uftrace_perf_reader *perf,
+				    struct uftrace_record *frs)
+{
+}
+
+static void dump_firefox_footer(struct uftrace_dump_ops *ops, struct uftrace_data *handle,
+				struct uftrace_opts *opts)
+{
+}
+
 /* flamegraph support */
 static struct uftrace_graph flame_graph = {
 	.root.head = LIST_HEAD_INIT(flame_graph.root.head),
@@ -1703,6 +1774,25 @@ int command_dump(int argc, char *argv[], struct uftrace_opts *opts)
 				.perf_event     = dump_chrome_perf_event,
 				.footer         = dump_chrome_footer,
 			},
+		};
+
+		do_dump_replay(&dump.ops, opts, &handle);
+	}
+	else if (opts->firefox_trace) {
+		struct uftrace_firefox_dump dump = {
+			.ops = { .header = dump_firefox_header,
+				 .task_start = dump_firefox_task_start,
+				 .inverted_time = dump_firefox_inverted_time,
+				 .task_rstack = dump_firefox_task_rstack,
+				 .task_event = dump_firefox_task_event,
+				 .kernel_start = dump_firefox_kernel_start,
+				 .cpu_start = dump_firefox_cpu_start,
+				 .kernel_func = dump_firefox_kernel_rstack,
+				 .kernel_event = dump_firefox_kernel_event,
+				 .lost = dump_firefox_kernel_lost,
+				 .perf_start = dump_firefox_perf_start,
+				 .perf_event = dump_firefox_perf_event,
+				 .footer = dump_firefox_footer },
 		};
 
 		do_dump_replay(&dump.ops, opts, &handle);
